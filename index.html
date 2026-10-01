@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Qui és qui?</title>
+<style>
+:root{--bg:#2f2748;--paper:#efe9fb;--ink:#2f2748;--hot:#8b3ff0;--sal:#f0666a;--mut:#b3a8cc}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:var(--bg);color:var(--paper);font:18px/1.4 "Helvetica Neue",Helvetica,Arial,sans-serif}
+section{max-width:960px;margin:0 auto;padding:24px 18px;text-align:center}
+h1,h2{font-weight:500;color:#a26af7;margin:.3em 0}
+h1{font-size:2.4rem}
+input,select,button{font:inherit;padding:12px 16px;border-radius:10px;border:2px solid var(--paper);margin:6px 0;max-width:100%}
+input,select{background:var(--paper);color:var(--ink);width:100%;max-width:380px}
+button{background:var(--sal);color:var(--ink);border-color:var(--sal);font-weight:bold;cursor:pointer}
+button:disabled{opacity:.4;cursor:default}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--sal);outline-offset:2px}
+.mut{color:var(--mut)}
+#thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin:16px 0}
+#thumbs div{background:var(--paper);padding:6px;border-radius:8px}
+#thumbs img{width:100%;height:110px;object-fit:cover;border-radius:4px}
+#thumbs div{cursor:grab}
+#thumbs .bar{display:flex;justify-content:space-between;align-items:center;color:var(--ink);padding:0}
+#thumbs .bar button{background:var(--hot);color:#fff;border-color:var(--hot);padding:2px 12px;margin:4px 0;border-radius:6px}
+#thumbs input{padding:6px;font-size:14px;border-width:1px;margin:4px 0 0}
+#qr{border:5px solid var(--sal);display:inline-block;background:#fff;padding:14px;border-radius:12px;margin:12px}
+#big{max-width:100%;max-height:68vh;border:10px solid var(--sal);border-radius:4px;box-shadow:0 8px 30px #0006}
+.row{display:flex;justify-content:space-between;background:var(--paper);color:var(--ink);padding:8px 14px;margin:6px auto;max-width:460px;border-radius:8px}
+.pl{background:var(--paper);color:var(--ink);max-width:520px;margin:6px auto;border-radius:8px;text-align:left;padding:8px 14px;border-left:6px solid var(--sal)}
+.pl summary{display:flex;justify-content:space-between;cursor:pointer;font-size:1.2rem}
+.pl ul{margin:8px 0 0;padding-left:18px;font-size:14px}
+.ok{color:#1d7a46}.ko{color:#c2334a}
+#reveal p{margin:4px 0;text-align:left}
+#reveal{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px;margin-top:18px}
+#reveal div{background:var(--paper);color:var(--ink);padding:6px;border-radius:8px;font-size:14px}
+#reveal img{width:100%;height:120px;object-fit:cover;border-radius:4px}
+.score{font-size:4rem;font-weight:500;color:var(--sal)}
+</style>
+</head>
+<body>
+
+<!-- MÀSTER -->
+<section id="login" hidden>
+  <h1>Qui és qui?</h1>
+  <p class="mut">Accés del mestre</p>
+  <input id="pw" type="password" placeholder="Contrasenya"><br>
+  <button id="go">Entrar</button>
+</section>
+
+<section id="setup" hidden>
+  <h2>Puja les fotos</h2>
+  <p class="mut">Una foto per persona. El nom surt del nom del fitxer (p. ex. <i>Marta Puig.jpg</i>); el pots corregir aquí sota. Les fotos no surten del teu navegador.</p>
+  <p class="mut">Ordena-les arrossegant-les o amb les fletxes: sortiran en aquest ordre.</p>
+  <input id="files" type="file" accept="image/*" multiple>
+  <button id="shuf" disabled>Barrejar</button>
+  <div id="thumbs"></div>
+  <button id="create" disabled>Crear la sala</button>
+  <p id="err" style="color:#f58a8e"></p>
+</section>
+
+<section id="lobby" hidden>
+  <h2>Escaneja per entrar</h2>
+  <div id="qr"></div>
+  <p class="mut" id="link" style="word-break:break-all;font-size:14px"></p>
+  <h2><span id="np">0</span> persones connectades</h2>
+  <p id="plist" class="mut"></p>
+  <button id="start">Començar</button>
+</section>
+
+<section id="round" hidden>
+  <h2 id="rt"></h2>
+  <img id="big" alt="">
+  <p class="mut"><span id="vc" style="color:var(--sal);font-weight:bold">0</span> respostes rebudes</p>
+  <button id="next">Següent</button>
+</section>
+
+<section id="end" hidden>
+  <h1>Resultats</h1>
+  <div id="rank"></div>
+  <h2>Les respostes</h2>
+  <div id="reveal"></div>
+</section>
+
+<!-- JUGADOR -->
+<section id="join" hidden>
+  <h1>Qui és qui?</h1>
+  <p>Com et dius?</p>
+  <input id="nick" placeholder="El teu nom" maxlength="30"><br>
+  <button id="joinbtn">Entrar</button>
+</section>
+
+<section id="wait" hidden><h2 id="msg"></h2></section>
+
+<section id="vote" hidden>
+  <h2 id="vt"></h2>
+  <p class="mut">Mira la pantalla gran i tria qui és.</p>
+  <select id="sel"></select><br>
+  <button id="send" disabled>Enviar</button>
+</section>
+
+<section id="fin" hidden>
+  <h2>Has encertat</h2>
+  <div class="score" id="sc"></div>
+  <p class="mut">Mira la pantalla per veure el rànquing.</p>
+</section>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+const PASSWORD = 'basetis';
+
+const $ = id => document.getElementById(id);
+const show = id => document.querySelectorAll('section').forEach(s => s.hidden = s.id !== id);
+const room = new URLSearchParams(location.search).get('sala');
+room ? player() : master();
+
+/* ---------------- MÀSTER ---------------- */
+function master() {
+  let photos = [], names = [], players = {}, idx = -1, phase = 'lobby';
+  show('login');
+  const tryLogin = () => $('pw').value === PASSWORD ? show('setup') : ($('pw').value = '');
+  $('go').onclick = tryLogin;
+  $('pw').onkeydown = e => { if (e.key === 'Enter') tryLogin(); };
+
+  $('files').onchange = e => {
+    photos = [...e.target.files].map(f => ({
+      src: URL.createObjectURL(f),
+      name: f.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').trim()
+    }));
+    renderThumbs();
+    $('create').disabled = $('shuf').disabled = !photos.length;
+  };
+
+  const move = (from, to) => {
+    if (to < 0 || to >= photos.length || from === to) return;
+    photos.splice(to, 0, photos.splice(from, 1)[0]);
+    renderThumbs();
+  };
+  $('shuf').onclick = () => {
+    for (let i = photos.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [photos[i], photos[j]] = [photos[j], photos[i]];
+    }
+    renderThumbs();
+  };
+  function renderThumbs() {
+    $('thumbs').innerHTML = '';
+    photos.forEach((p, i) => {
+      const d = document.createElement('div'), im = document.createElement('img'), n = document.createElement('input'),
+        bar = document.createElement('div'), l = document.createElement('button'), r = document.createElement('button'), pos = document.createElement('b');
+      d.draggable = true;
+      d.ondragstart = e => e.dataTransfer.setData('text/plain', i);
+      d.ondragover = e => e.preventDefault();
+      d.ondrop = e => { e.preventDefault(); move(+e.dataTransfer.getData('text/plain'), i); };
+      im.src = p.src; im.draggable = false;
+      n.value = p.name; n.oninput = () => p.name = n.value.trim();
+      l.textContent = '◀'; l.onclick = () => move(i, i - 1);
+      r.textContent = '▶'; r.onclick = () => move(i, i + 1);
+      pos.textContent = i + 1;
+      bar.className = 'bar'; bar.append(l, pos, r);
+      d.append(im, n, bar); $('thumbs').append(d);
+    });
+  }
+
+  $('create').onclick = () => {
+    names = [...new Set(photos.map(p => p.name))].sort((a, b) => a.localeCompare(b, 'ca'));
+    const err = m => { $('err').textContent = m; $('create').disabled = false; $('create').textContent = 'Crear la sala'; };
+    if (typeof Peer === 'undefined') return err('No s\'ha pogut carregar la llibreria PeerJS. Comprova la connexió a internet o si un bloquejador d\'anuncis bloqueja cdnjs.cloudflare.com.');
+    $('err').textContent = ''; $('create').disabled = true; $('create').textContent = 'Creant la sala…';
+    const peer = new Peer('fq' + Math.random().toString(36).slice(2, 8));
+    const t = setTimeout(() => err('El servidor de connexió no respon (0.peerjs.com). Prova una altra xarxa o desactiva bloquejadors/VPN i torna-ho a provar.'), 12000);
+    peer.on('error', e => err('Error de connexió: ' + (e.type || e)));
+    peer.on('open', id => {
+      clearTimeout(t);
+      const url = location.href.split('?')[0].split('#')[0] + '?sala=' + id;
+      $('link').textContent = url;
+      try { new QRCode($('qr'), { text: url, width: 260, height: 260 }); }
+      catch (e) { $('link').textContent = 'No s\'ha pogut generar el QR. Enllaç: ' + url; }
+      show('lobby');
+    });
+    peer.on('connection', c => c.on('data', m => {
+      if (m.t === 'hello') {
+        const p = players[m.pid] || (players[m.pid] = { votes: [] });
+        p.nick = m.nick; p.conn = c; send(p); render();
+      } else if (m.t === 'vote' && phase === 'round' && m.idx === idx && players[m.pid]) {
+        players[m.pid].votes[idx] = m.name; render();
+      }
+    }));
+  };
+
+  const score = p => photos.reduce((s, ph, i) => s + (p.votes[i] === ph.name ? 1 : 0), 0);
+  function send(p) {
+    if (!p.conn || !p.conn.open) return;
+    p.conn.send(phase === 'end'
+      ? { t: 'end', score: score(p), total: photos.length }
+      : { t: 'state', phase, idx, total: photos.length, names, voted: p.votes[idx] !== undefined });
+  }
+  const broadcast = () => Object.values(players).forEach(send);
+  function render() {
+    const ps = Object.values(players);
+    $('np').textContent = ps.length;
+    $('plist').textContent = ps.map(p => p.nick).join(', ');
+    $('vc').textContent = ps.filter(p => p.votes[idx] !== undefined).length + ' de ' + ps.length;
+  }
+  function showRound() {
+    phase = 'round';
+    $('rt').textContent = 'Foto ' + (idx + 1) + ' de ' + photos.length;
+    $('big').src = photos[idx].src;
+    $('next').textContent = idx === photos.length - 1 ? 'Finalitzar' : 'Següent';
+    show('round'); render(); broadcast();
+  }
+  $('start').onclick = () => { idx = 0; showRound(); };
+  $('next').onclick = () => { ++idx < photos.length ? showRound() : finish(); };
+
+  function finish() {
+    phase = 'end';
+    const ps = Object.values(players).map(p => ({ nick: p.nick, votes: p.votes, s: score(p) })).sort((a, b) => b.s - a.s);
+    let pos = 0;
+    $('rank').innerHTML = ps.map((p, i) => {
+      if (i === 0 || p.s !== ps[i - 1].s) pos = i + 1;            // empats comparteixen posició
+      const medal = ['🥇', '🥈', '🥉'][pos - 1] || pos + '.';
+      const det = photos.map((ph, k) => {
+        const v = p.votes[k];
+        return `<li class="${v === ph.name ? 'ok' : 'ko'}">${k + 1}. ${esc(ph.name)}: ` +
+          (v === undefined ? 'sense resposta' : v === ph.name ? '✓' : '✗ ha dit ' + esc(v)) + '</li>';
+      }).join('');
+      return `<details class="pl"><summary><span>${medal} ${esc(p.nick)}</span><b>${p.s} / ${photos.length}</b></summary><ul>${det}</ul></details>`;
+    }).join('');
+    $('reveal').innerHTML = photos.map((ph, i) => {
+      const ok = ps.filter(p => p.votes[i] === ph.name).map(p => esc(p.nick));
+      const ko = ps.filter(p => p.votes[i] !== ph.name).map(p => esc(p.nick) + ' (' + (p.votes[i] ? esc(p.votes[i]) : 'sense resposta') + ')');
+      return `<div><img src="${ph.src}"><b>${esc(ph.name)}</b><br>${ok.length} de ${ps.length} l'han encertat` +
+        `<p class="ok">✓ ${ok.join(', ') || 'ningú'}</p><p class="ko">✗ ${ko.join(', ') || 'ningú'}</p></div>`;
+    }).join('');
+    show('end'); broadcast();
+  }
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+}
+
+/* ---------------- JUGADOR ---------------- */
+function player() {
+  const pid = localStorage.pid || (localStorage.pid = Math.random().toString(36).slice(2));
+  let peer, conn, curIdx = -1;
+  show('join'); $('nick').value = localStorage.nick || '';
+  $('joinbtn').onclick = () => {
+    const n = $('nick').value.trim(); if (!n) return;
+    localStorage.nick = n; connect();
+  };
+
+  function connect() {
+    show('wait'); $('msg').textContent = 'Connectant…';
+    if (peer) peer.destroy();
+    peer = new Peer();
+    peer.on('open', () => {
+      conn = peer.connect(room, { reliable: true });
+      conn.on('open', () => conn.send({ t: 'hello', pid, nick: localStorage.nick }));
+      conn.on('data', onMsg);
+      conn.on('close', () => { $('msg').textContent = 'Connexió perduda. Tornant a connectar…'; show('wait'); setTimeout(connect, 2000); });
+    });
+    peer.on('error', () => setTimeout(connect, 3000));
+  }
+
+  function onMsg(m) {
+    if (m.t === 'end') { return show('fin'); }
+    if (m.phase === 'lobby') { $('msg').textContent = 'Hola, ' + localStorage.nick + '! Esperant que comenci…'; return show('wait'); }
+    if (m.voted) { $('msg').textContent = 'Resposta enviada ✓ Mira la pantalla.'; curIdx = m.idx; return show('wait'); }
+    curIdx = m.idx;
+    $('vt').textContent = 'Foto ' + (m.idx + 1) + ' de ' + m.total;
+    $('sel').innerHTML = '<option value="">— Tria un nom —</option>' + m.names.map(n => {
+      const o = document.createElement('option'); o.textContent = o.value = n; return o.outerHTML;
+    }).join('');
+    $('send').disabled = true;
+    show('vote');
+  }
+  $('sel').onchange = () => $('send').disabled = !$('sel').value;
+  $('send').onclick = () => {
+    conn.send({ t: 'vote', pid, idx: curIdx, name: $('sel').value });
+    $('msg').textContent = 'Resposta enviada ✓ Espera la següent foto.';
+    show('wait');
+  };
+}
+</script>
+</body>
+</html>
