@@ -9,9 +9,9 @@
 *{box-sizing:border-box}
 body{margin:0;min-height:100vh;background:var(--bg);color:var(--paper);font:18px/1.4 "Helvetica Neue",Helvetica,Arial,sans-serif}
 section{max-width:960px;margin:0 auto;padding:24px 18px;text-align:center}
-h1,h2{font-weight:500;color:#a26af7;margin:.3em 0}
+h1,h2{font-weight:700;color:#a26af7;margin:.3em 0}
 h1{font-size:2.4rem}
-input,select,button{font:inherit;padding:12px 16px;border-radius:10px;border:2px solid var(--paper);margin:6px 0;max-width:100%}
+input,select,button{font:inherit;padding:12px 16px;border-radius:10px;border:2px solid var(--paper);margin:8px 0;max-width:100%}
 input,select{background:var(--paper);color:var(--ink);width:100%;max-width:380px}
 button{background:var(--sal);color:var(--ink);border-color:var(--sal);font-weight:bold;cursor:pointer}
 button:disabled{opacity:.4;cursor:default}
@@ -34,7 +34,11 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid 
 #reveal p{margin:4px 0;text-align:left}
 #reveal{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px;margin-top:18px}
 #reveal div{background:var(--paper);color:var(--ink);padding:6px;border-radius:8px;font-size:14px}
-#reveal img{width:100%;height:120px;object-fit:cover;border-radius:4px}
+#reveal img{width:100%;height:280px;object-fit:cover;border-radius:4px;cursor:pointer;transition:opacity .2s}
+#reveal img:hover{opacity:.85}
+#thumbs div.drag-over{outline:3px dashed var(--sal);outline-offset:-3px;opacity:.6}
+#lightbox{position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:9999;cursor:pointer;padding:16px}
+#lightbox img{max-width:95vw;max-height:90vh;border-radius:8px;box-shadow:0 8px 40px #000a}
 .score{font-size:4rem;font-weight:500;color:var(--sal)}
 </style>
 </head>
@@ -43,8 +47,9 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid 
 <!-- MÀSTER -->
 <section id="login" hidden>
   <h1>Qui és qui?</h1>
-  <p class="mut">Accés del mestre</p>
-  <input id="pw" type="password" placeholder="Contrasenya"><br>
+  <p class="mut">Accés del gestor</p>
+  <input id="pw" type="password" placeholder="Contrasenya">
+  <div style="height:18px"></div>
   <button id="go">Entrar</button>
 </section>
 
@@ -100,7 +105,7 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid 
 </section>
 
 <section id="fin" hidden>
-  <h2>Has encertat</h2>
+  <h2 id="fin-title">Has encertat</h2>
   <div class="score" id="sc"></div>
   <p class="mut">Mira la pantalla per veure el rànquing.</p>
 </section>
@@ -111,6 +116,13 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid 
 const PASSWORD = 'basetis';
 
 const $ = id => document.getElementById(id);
+function openLightbox(src) {
+  const lb = document.createElement('div'); lb.id = 'lightbox';
+  const img = document.createElement('img'); img.src = src;
+  lb.appendChild(img);
+  lb.onclick = () => lb.remove();
+  document.body.appendChild(lb);
+}
 const show = id => document.querySelectorAll('section').forEach(s => s.hidden = s.id !== id);
 const room = new URLSearchParams(location.search).get('sala');
 room ? player() : master();
@@ -150,9 +162,28 @@ function master() {
       const d = document.createElement('div'), im = document.createElement('img'), n = document.createElement('input'),
         bar = document.createElement('div'), l = document.createElement('button'), r = document.createElement('button'), pos = document.createElement('b');
       d.draggable = true;
-      d.ondragstart = e => e.dataTransfer.setData('text/plain', i);
-      d.ondragover = e => e.preventDefault();
-      d.ondrop = e => { e.preventDefault(); move(+e.dataTransfer.getData('text/plain'), i); };
+      d.ondragstart = e => { e.dataTransfer.setData('text/plain', i); e.dataTransfer.effectAllowed = 'move'; d.style.opacity = '0.4'; };
+      d.ondragend = () => { d.style.opacity = ''; };
+      d.ondragover = e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; d.classList.add('drag-over'); };
+      d.ondragleave = () => d.classList.remove('drag-over');
+      d.ondrop = e => { e.preventDefault(); d.classList.remove('drag-over'); move(+e.dataTransfer.getData('text/plain'), i); };
+      /* Touch drag support */
+      let touchIdx = null;
+      d.ontouchstart = e => { touchIdx = i; d.style.opacity = '0.4'; };
+      d.ontouchmove = e => { e.preventDefault(); };
+      d.ontouchend = e => {
+        d.style.opacity = '';
+        const touch = e.changedTouches[0];
+        const target = document.elementFromPoint(touch.clientX, touch.clientY);
+        if (target) {
+          const card = target.closest('#thumbs > div');
+          if (card) {
+            const cards = [...$('thumbs').children];
+            const dropIdx = cards.indexOf(card);
+            if (dropIdx !== -1 && dropIdx !== touchIdx) move(touchIdx, dropIdx);
+          }
+        }
+      };
       im.src = p.src; im.draggable = false;
       n.value = p.name; n.oninput = () => p.name = n.value.trim();
       l.textContent = '◀'; l.onclick = () => move(i, i - 1);
@@ -230,7 +261,7 @@ function master() {
     $('reveal').innerHTML = photos.map((ph, i) => {
       const ok = ps.filter(p => p.votes[i] === ph.name).map(p => esc(p.nick));
       const ko = ps.filter(p => p.votes[i] !== ph.name).map(p => esc(p.nick) + ' (' + (p.votes[i] ? esc(p.votes[i]) : 'sense resposta') + ')');
-      return `<div><img src="${ph.src}"><b>${esc(ph.name)}</b><br>${ok.length} de ${ps.length} l'han encertat` +
+      return `<div><img src="${ph.src}" onclick="openLightbox(this.src)"><b>${esc(ph.name)}</b><br>${ok.length} de ${ps.length} l'han encertat` +
         `<p class="ok">✓ ${ok.join(', ') || 'ningú'}</p><p class="ko">✗ ${ko.join(', ') || 'ningú'}</p></div>`;
     }).join('');
     show('end'); broadcast();
@@ -262,7 +293,7 @@ function player() {
   }
 
   function onMsg(m) {
-    if (m.t === 'end') { return show('fin'); }
+    if (m.t === 'end') { $('sc').textContent = m.score + ' / ' + m.total; $('fin-title').textContent = 'Has encertat ' + m.score + ' de ' + m.total; return show('fin'); }
     if (m.phase === 'lobby') { $('msg').textContent = 'Hola, ' + localStorage.nick + '! Esperant que comenci…'; return show('wait'); }
     if (m.voted) { $('msg').textContent = 'Resposta enviada ✓ Mira la pantalla.'; curIdx = m.idx; return show('wait'); }
     curIdx = m.idx;
